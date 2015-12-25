@@ -85,9 +85,11 @@ int signal, struct sigcontext *scp
     return 0;
 #endif
 
-  if (in_vm86)
+  if (in_vm86) {
+    if ( _trapno == 0x0e && VGA_EMU_FAULT(scp, code, 0) == True)
+      return 0;
     return vm86_fault(scp);
-
+  }
 #define VGA_ACCESS_HACK 1
 #if VGA_ACCESS_HACK
   if(_trapno==0x0e && Video->update_screen && !DPMIValidSelector(_cs)) {
@@ -133,6 +135,8 @@ int signal, struct sigcontext *scp
       }
     } /*!DPMIValidSelector(_cs)*/
     else {
+      if (_trapno == 0x0e && VGA_EMU_FAULT(scp, code, 1) == True)
+        return dpmi_check_return(scp);
       /* Not in dosemu code: dpmi_fault() will handle that */
       return dpmi_fault(scp);
     }

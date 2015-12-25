@@ -86,6 +86,7 @@ int signal, struct sigcontext *scp
 #endif
 
   if (in_vm86) {
+    allow_emerg_signals();
     if ( _trapno == 0x0e && VGA_EMU_FAULT(scp, code, 0) == True)
       return 0;
     return vm86_fault(scp);
@@ -103,6 +104,7 @@ int signal, struct sigcontext *scp
  *  but if only the protection needs to be adjusted (no instructions emulated)
  *  we should be able to handle it in DOSEMU
  */
+    allow_emerg_signals();
     if(VGA_EMU_FAULT(scp,code,1)==True) {
       v_printf("BUG: dosemu touched protected video mem, but trying to recover\n");
       return 0;
@@ -135,6 +137,7 @@ int signal, struct sigcontext *scp
       }
     } /*!DPMIValidSelector(_cs)*/
     else {
+      allow_emerg_signals();
       if (_trapno == 0x0e && VGA_EMU_FAULT(scp, code, 1) == True)
         return dpmi_check_return(scp);
       /* Not in dosemu code: dpmi_fault() will handle that */

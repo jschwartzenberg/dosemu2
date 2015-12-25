@@ -138,7 +138,7 @@ static void newsetsig(int sig, void (*fun)(int sig, siginfo_t *si, void *uc))
    expects. That means restoring fs and gs for vm86 (necessary for
    2.4 kernels) and fs, gs and eflags for DPMI. */
 __attribute__((no_instrument_function))
-static void __init_handler(struct sigcontext *scp, int async)
+void init_handler(struct sigcontext *scp, int async)
 {
 #ifdef __x86_64__
   unsigned short __ss;
@@ -217,8 +217,7 @@ static void __init_handler(struct sigcontext *scp, int async)
 #endif
 }
 
-__attribute__((no_instrument_function))
-void init_handler(struct sigcontext *scp, int async)
+void allow_emerg_signals(void)
 {
   /* Async signals are initially blocked.
    * We need to restore registers before unblocking async signals.
@@ -232,7 +231,7 @@ void init_handler(struct sigcontext *scp, int async)
    * Sync signals like SIGSEGV are never blocked.
    */
   sigset_t mask;
-  __init_handler(scp, async);
+
   sigemptyset(&mask);
   sigaddset(&mask, SIGINT);
   sigaddset(&mask, SIGHUP);

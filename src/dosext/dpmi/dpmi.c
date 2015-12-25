@@ -87,6 +87,21 @@ extern long int __sysconf (int); /* for Debian eglibc 2.13-3 */
 #ifdef __linux__
 #include "cpu-emu.h"
 #include "emu-ldt.h"
+
+#ifdef __x86_64__
+/*
+ * UC_SAVED_SS will be set when delivering 64-bit or x32 signals on
+ * kernels that save SS in the sigcontext.  Kernels that set UC_SAVED_SS
+ * allow signal handlers to set UC_RESTORE_SS; if UC_RESTORE_SS is set,
+ * then sigreturn will restore SS.
+ *
+ * For compatibility with old programs, the kernel will *not* set
+ * UC_RESTORE_SS when delivering signals.
+ */
+#define UC_SIGCONTEXT_SS       0x2
+#define UC_STRICT_RESTORE_SS   0x4
+#endif
+
 #endif
 
 /*
@@ -440,10 +455,24 @@ void dpmi_iret_setup(struct sigcontext *scp)
 {
   if (!DPMIValidSelector(_cs)) return;
 
-  iret_frame_setup(scp);
-  _eflags &= ~TF;
-  _rip = (unsigned long)DPMI_iret;
-  _cs = getsegment(cs);
+  struct ucontext *uc = (void *)(((char *)scp) -
+				 offsetof(struct ucontext, uc_mcontext));
+
+  if (uc->uc_flags & UC_SIGCONTEXT_SS) {
+    /*
+     * On Linux 4.4 (possibly) and up, the kernel can fully restore
+     * SS and ESP, so we don't need any special tricks.  To avoid confusion,
+     * force strict restore.  (Some 4.1 versions support this as well but
+     * without the uc_flags bits.  It's not trying to detect those kernels.)
+     */
+    uc->uc_flags |= UC_STRICT_RESTORE_SS;
+  } else {
+    /* Older kernels can't restore SS and may not be able to restore ESP. */
+    iret_frame_setup(scp);
+    _eflags &= ~TF;
+    _rip = (unsigned long)DPMI_iret;
+    _cs = getsegment(cs);
+  }
 }
 
 #else

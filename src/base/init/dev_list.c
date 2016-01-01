@@ -40,6 +40,7 @@
 #include "ipx.h"
 #include "sound.h"
 #include "joystick.h"
+#include "dpmi.h"
 
 struct io_dev_struct {
   const char * name;
@@ -81,6 +82,7 @@ static struct io_dev_struct io_devices[MAX_IO_DEVICES] = {
   { "ipx",      ipx_init,    NULL,          NULL },
 #endif
   { "packet driver", pkt_init, pkt_reset,   pkt_term },
+  { "dpmi",    dpmi_setup,   dpmi_reset,    dpmi_done },
   { NULL,      NULL,         NULL,          NULL }
 };
 

@@ -57,6 +57,7 @@ extern long int __sysconf (int); /* for Debian eglibc 2.13-3 */
 #include "timers.h"
 #include "mhpdbg.h"
 #include "hlt.h"
+#include "coopth.h"
 #if 0
 #define SHOWREGS
 #endif
@@ -116,6 +117,7 @@ static int in_dpmi_irq;
 int dpmi_mhp_TF;
 unsigned char dpmi_mhp_intxxtab[256];
 static int dpmi_is_cli;
+static int dpmi_tid;
 
 #define CLI_BLACKLIST_LEN 128
 static unsigned char * cli_blacklist[CLI_BLACKLIST_LEN];
@@ -459,8 +461,7 @@ void dpmi_iret_setup(struct sigcontext *scp)
   _rip = (unsigned long)DPMI_iret;
   _cs = getsegment(cs);
 }
-
-#else
+#endif
 
 static int in_indirect_dpmi_transfer;
 
@@ -471,7 +472,6 @@ static void indirect_dpmi_transfer(void)
   asm volatile ("\t hlt\n");
   __builtin_unreachable();
 }
-#endif
 
 #if DIRECT_DPMI_CONTEXT_SWITCH
 #ifdef __i386__
@@ -1341,7 +1341,6 @@ static void Return_to_dosemu_code(struct sigcontext *scp,
   scp->fpstate = NULL;
 }
 
-#ifdef __i386__
 int indirect_dpmi_switch(struct sigcontext *scp)
 {
     if (!in_indirect_dpmi_transfer)
@@ -1350,7 +1349,6 @@ int indirect_dpmi_switch(struct sigcontext *scp)
     copy_context(scp, &DPMI_CLIENT.stack_frame, 0);
     return 1;
 }
-#endif
 
 static void *enter_lpms(struct sigcontext *scp)
 {
@@ -3081,6 +3079,11 @@ void run_dpmi(void)
 #endif
 }
 
+static void dpmi_thr(void *arg)
+{
+    indirect_dpmi_transfer();
+}
+
 void dpmi_setup(void)
 {
     int i, type;
@@ -3199,6 +3202,13 @@ void dpmi_setup(void)
       memcpy(lbuf, ldt_buffer, LDT_ENTRIES * LDT_ENTRY_SIZE);
       msdos_ldt_setup(lbuf, alias);
     }
+
+    dpmi_tid = coopth_create("dpmi");
+    /* dpmi is a detached thread. Attempts to bind it to the modeswitch
+     * points (dpmi has many!) will likely only cause the troubles. */
+    coopth_set_detached(dpmi_tid);
+    coopth_init_sleeping(dpmi_tid);
+    coopth_start(dpmi_tid, dpmi_thr, NULL);
     return;
 
 err:
@@ -4898,4 +4908,9 @@ int in_dpmi_pm(void)
 int dpmi_active(void)
 {
   return in_dpmi;
+}
+
+void dpmi_done(void)
+{
+  coopth_cancel(dpmi_tid);
 }

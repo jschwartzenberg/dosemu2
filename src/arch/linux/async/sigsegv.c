@@ -108,7 +108,7 @@ int signal, struct sigcontext *scp
   }
 #endif
 
-  if (in_dpmi) {
+//  if (in_dpmi) {
     /* At first let's find out where we came from */
     if (!DPMIValidSelector(_cs)) {
       /* Fault in dosemu code */
@@ -124,7 +124,7 @@ int signal, struct sigcontext *scp
       }
 #endif
       { /* No, not HLT, too bad :( */
-	error("Fault in dosemu code, in_dpmi=%i\n", in_dpmi);
+	error("Fault in dosemu code, in_dpmi=%i\n", dpmi_active());
         /* TODO - we can start gdb here */
         /* start_gdb() */
 
@@ -136,7 +136,7 @@ int signal, struct sigcontext *scp
       /* Not in dosemu code: dpmi_fault() will handle that */
       return dpmi_fault(scp);
     }
-  } /*in_dpmi*/
+//  } /*in_dpmi*/
 
 bad:
 /* All recovery attempts failed, going to die :( */
@@ -150,7 +150,7 @@ bad:
 	  "eip: 0x%08lx  esp: 0x%08lx  eflags: 0x%08lx\n"
 	  "cs: 0x%04x  ds: 0x%04x  es: 0x%04x  ss: 0x%04x\n"
 	  "fs: 0x%04x  gs: 0x%04x\n",
-	  (in_dpmi ? "DPMI client" : "VM86()"),
+	  (in_dpmi_pm() ? "DPMI client" : "VM86()"),
 	  _trapno, _err, _cr2,
 	  _rip, _rsp, _eflags, _cs, _ds, _es, _ss, _fs, _gs);
 #ifdef __x86_64__
@@ -256,7 +256,7 @@ static void dosemu_fault0(int signal, struct sigcontext *scp)
     /* it may be necessary to fix up a page fault in the DPMI fault handling
        code for $_cpu_emu = "vm86". This really shouldn't happen but not all
        cases have been fixed yet */
-    if (config.cpuemu == 3 && !CONFIG_CPUSIM && in_dpmi && !in_dpmi_dos_int &&
+    if (config.cpuemu == 3 && !CONFIG_CPUSIM && in_dpmi_pm() &&
 	e_emu_fault(scp)) {
       fault_cnt--;
       return;

@@ -3092,8 +3092,7 @@ void dpmi_setup(void)
     /* dpmi is a detached thread. Attempts to bind it to the modeswitch
      * points (dpmi has many!) will likely only cause the troubles. */
     coopth_set_detached(dpmi_tid);
-    coopth_init_sleeping(dpmi_tid);
-    coopth_start(dpmi_tid, dpmi_thr, NULL);
+    coopth_start_sleeping(dpmi_tid, dpmi_thr, NULL);
     dpmi_ctid = coopth_create("dpmi_control");
     coopth_set_detached(dpmi_ctid);
     return;

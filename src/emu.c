@@ -313,11 +313,11 @@ int main(int argc, char **argv)
     pci_setup();
     device_init();		/* priv initialization of video etc. */
     extra_port_init();		/* setup ports dependent on config */
+    mapping_init();		/* initialize mapping drivers */
     signal_pre_init();          /* initialize sig's & sig handlers */
     SIG_init();			/* Silly Interrupt Generator */
     pkt_priv_init();            /* initialize the packet driver interface */
 
-    mapping_init();		/* initialize mapping drivers */
     low_mem_init();		/* initialize the lower 1Meg */
 
     if (can_do_root_stuff && !under_root_login) {

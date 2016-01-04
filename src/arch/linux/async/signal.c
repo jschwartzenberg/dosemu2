@@ -40,7 +40,7 @@
 #include "userhook.h"
 #include "ringbuf.h"
 #include "dosemu_config.h"
-
+#include "mapping.h"
 #include "keyb_clients.h"
 #include "keyb_server.h"
 #include "sound.h"
@@ -69,6 +69,9 @@ static struct sigchld_hndl chld_hndl[MAX_SIGCHLD_HANDLERS];
 static int chd_hndl_num;
 
 static sigset_t q_mask;
+static void *cstack;
+static void *backup_stack;
+static stack_t sig_stk;
 
 static int sh_tid;
 static int in_handle_signals;
@@ -202,6 +205,8 @@ static void __init_handler(struct sigcontext *scp, int async)
   if (!DPMIValidSelector(_cs) && !async)
     return;
 
+  loadregister(ds, eflags_fs_gs.ds);
+  loadregister(es, eflags_fs_gs.es);
   /* restore %fs and %gs for compatibility with NPTL. */
   if (getsegment(fs) != eflags_fs_gs.fs)
     loadregister(fs, eflags_fs_gs.fs);
@@ -496,14 +501,19 @@ signal_pre_init(void)
 /* reserve 1024 uncommitted pages for stack */
 #define SIGSTACK_SIZE (1024 * getpagesize())
   stack_t ss;
-  void *cstack;
 
 #ifndef MAP_STACK
 #define MAP_STACK 0
 #endif
-  cstack = mmap(NULL, SIGSTACK_SIZE, PROT_READ | PROT_WRITE,
-	MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK, -1, 0);
+  cstack = alloc_mapping(MAPPING_SHARED, SIGSTACK_SIZE, -1);
   if (cstack == MAP_FAILED) {
+    error("Unable to allocate stack\n");
+    config.exitearly = 1;
+    return;
+  }
+  backup_stack = alias_mapping(MAPPING_OTHER, -1, SIGSTACK_SIZE,
+	PROT_READ | PROT_WRITE, cstack);
+  if (backup_stack == MAP_FAILED) {
     error("Unable to allocate stack\n");
     config.exitearly = 1;
     return;
@@ -915,4 +925,37 @@ static void async_awake(void *arg)
     if (i)
       cbk.func(cbk.arg);
   } while (i);
+}
+
+void signal_return_to_dosemu(void)
+{
+  stack_t stk;
+  int err;
+  register unsigned long sp asm("sp");
+  unsigned char *top = cstack + SIGSTACK_SIZE;
+  unsigned char *btop = backup_stack + SIGSTACK_SIZE;
+  unsigned long delta = (unsigned long)(top - sp);
+
+  asm volatile("mov %0, %%rsp\n" :: "r"(btop - delta) : "sp");
+  stk.ss_flags = SS_DISABLE;
+  err = sigaltstack(&stk, &sig_stk);
+  if (err)
+    perror("sigaltstack");
+  fault_cnt--;
+}
+
+void signal_return_to_dpmi(void)
+{
+  int err;
+  register unsigned long sp asm("sp");
+  unsigned char *top = cstack + SIGSTACK_SIZE;
+  unsigned char *btop = backup_stack + SIGSTACK_SIZE;
+  unsigned long delta = (unsigned long)(btop - sp);
+
+  asm volatile("mov %0, %%rsp\n" :: "r"(top - delta) : "sp");
+  sig_stk.ss_flags = SS_ONSTACK;
+  err = sigaltstack(&sig_stk, NULL);
+  if (err)
+    perror("sigaltstack");
+  fault_cnt++;
 }

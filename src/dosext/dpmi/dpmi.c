@@ -467,6 +467,7 @@ void dpmi_iret_setup(struct sigcontext *scp)
 }
 #endif
 
+#if !DIRECT_DPMI_CONTEXT_SWITCH
 static int in_indirect_dpmi_transfer;
 
 __attribute__((noreturn))
@@ -476,6 +477,7 @@ static void indirect_dpmi_transfer(void)
   asm volatile ("\t hlt\n");
   __builtin_unreachable();
 }
+#endif
 
 #if DIRECT_DPMI_CONTEXT_SWITCH
 #ifdef __i386__
@@ -1217,11 +1219,15 @@ static void Return_to_dosemu_code(struct sigcontext *scp,
 
 int indirect_dpmi_switch(struct sigcontext *scp)
 {
+#if !DIRECT_DPMI_CONTEXT_SWITCH
     if (!in_indirect_dpmi_transfer)
 	return 0;
     in_indirect_dpmi_transfer--;
     copy_context(scp, &DPMI_CLIENT.stack_frame, 0);
     return 1;
+#else
+    return 0;
+#endif
 }
 
 static void *enter_lpms(struct sigcontext *scp)

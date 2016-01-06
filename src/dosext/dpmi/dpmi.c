@@ -2963,6 +2963,8 @@ static void run_dpmi_thr(void *arg)
     else
       break;
   }
+  if (!in_dpmi)
+    coopth_cancel(dpmi_tid);
 }
 
 static void run_dpmi(void)
@@ -3098,7 +3100,6 @@ void dpmi_setup(void)
     /* dpmi is a detached thread. Attempts to bind it to the modeswitch
      * points (dpmi has many!) will likely only cause the troubles. */
     coopth_set_detached(dpmi_tid);
-    coopth_start_sleeping(dpmi_tid, dpmi_thr, NULL);
     dpmi_ctid = coopth_create("dpmi_control");
     coopth_set_detached(dpmi_ctid);
     return;
@@ -3256,7 +3257,6 @@ void dpmi_init(void)
 	    dpmi_sel(), CS, DS, SS, ES);
   }
 
-  dpmi_set_pm(1);
   DPMI_CLIENT.pm_block_root = calloc(1, sizeof(dpmi_pm_block_root));
   DPMI_CLIENT.in_dpmi_rm_stack = 0;
   scp   = &DPMI_CLIENT.stack_frame;
@@ -3298,7 +3298,11 @@ void dpmi_init(void)
     SETIVEC(0x24, DPMI_SEG, DPMI_OFF + HLT_OFF(DPMI_int24));
 
     in_dpmi_irq = 0;
+
+    coopth_start_sleeping(dpmi_tid, dpmi_thr, NULL);
   }
+
+  dpmi_set_pm(1);
 
   for (i = 0; i < RSP_num; i++) {
     D_printf("DPMI: Calling RSP %i\n", i);
@@ -4805,5 +4809,4 @@ int dpmi_active(void)
 
 void dpmi_done(void)
 {
-  coopth_cancel(dpmi_tid);
 }

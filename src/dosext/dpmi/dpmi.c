@@ -1218,10 +1218,14 @@ static void Return_to_dosemu_code(struct sigcontext *scp,
     coopth_wake_up(dpmi_ctid);
     return;
   }
+  if (debug_level('M') > 5)
+    D_printf("DPMI: switch to dosemu\n");
   signal_return_to_dosemu();
   coopth_wake_up(dpmi_ctid);
   coopth_sleep();
   signal_return_to_dpmi();
+  if (debug_level('M') > 5)
+    D_printf("DPMI: switch to dpmi\n");
   copy_context(scp, &DPMI_CLIENT.stack_frame, 0);
 }
 

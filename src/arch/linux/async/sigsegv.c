@@ -56,11 +56,7 @@ void print_exception_info(struct sigcontext *scp);
  */
 
 __attribute__((no_instrument_function))
-static int dosemu_fault1(
-#ifdef __linux__
-int signal, struct sigcontext *scp
-#endif /* __linux__ */
-)
+static int dosemu_fault1(int signal, struct sigcontext *scp, stack_t *stk)
 {
 #if 0
   _eflags &= ~(AC|ID);
@@ -114,12 +110,13 @@ int signal, struct sigcontext *scp
       /* Fault in dosemu code */
       /* Now see if it is HLT */
       if (indirect_dpmi_switch(scp)) {
-	/* Well, must come from dpmi_control() */
+        /* Well, must come from dpmi_control() */
         /* Note: when using DIRECT_DPMI_CONTEXT_SWITCH, we only come
          * here if we have set the trap-flags (TF)
          * ( needed for dosdebug only )
          */
-	return 0;
+        signal_set_altstack(stk);
+        return 0;
       }
       error("Fault in dosemu code, in_dpmi=%i\n", dpmi_active());
       goto bad;	/* well, this goto is unnecessary but I like gotos:) */
@@ -210,7 +207,7 @@ bad:
 
 /* noinline is to prevent gcc from moving TLS access around init_handler() */
 __attribute__((noinline))
-static void dosemu_fault0(int signal, struct sigcontext *scp)
+static void dosemu_fault0(int signal, struct sigcontext *scp, stack_t *stk)
 {
   int retcode;
   pid_t tid;
@@ -260,7 +257,7 @@ static void dosemu_fault0(int signal, struct sigcontext *scp)
     g_printf("Entering fault handler, signal=%i _trapno=0x%X\n",
       signal, _trapno);
 
-  retcode = dosemu_fault1 (signal, scp);
+  retcode = dosemu_fault1(signal, scp, stk);
   fault_cnt--;
 
   if (debug_level('g')>8)
@@ -274,13 +271,13 @@ static void dosemu_fault0(int signal, struct sigcontext *scp)
 __attribute__((no_instrument_function))
 void dosemu_fault(int signal, siginfo_t *si, void *uc)
 {
-  struct sigcontext *scp =
-	(struct sigcontext *)&((ucontext_t *)uc)->uc_mcontext;
+  ucontext_t *uct = uc;
+  struct sigcontext *scp = (struct sigcontext *)&uct->uc_mcontext;
   /* need to call init_handler() before any syscall.
    * Additionally, TLS access should be done in a separate no-inline
    * function, so that gcc not to move the TLS access around init_handler(). */
   init_handler(scp, 0);
-  dosemu_fault0(signal, scp);
+  dosemu_fault0(signal, scp, &uct->uc_stack);
   deinit_handler(scp);
 }
 #endif /* __linux__ */

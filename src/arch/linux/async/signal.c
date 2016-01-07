@@ -936,6 +936,8 @@ static void async_awake(void *arg)
   } while (i);
 }
 
+static int saved_fc;
+
 void signal_return_to_dosemu(void)
 {
   int err;
@@ -962,7 +964,8 @@ void signal_return_to_dosemu(void)
   err = sigaltstack(&ss, NULL);
   if (err)
     perror("sigaltstack");
-  fault_cnt--;
+  saved_fc = fault_cnt;
+  fault_cnt = 0;
 #if SIGALTSTACK_WA
   longjmp(hack, 1);
 #endif
@@ -970,7 +973,7 @@ void signal_return_to_dosemu(void)
 
 void signal_return_to_dpmi(void)
 {
-  fault_cnt++;
+  fault_cnt = saved_fc;
 }
 
 void signal_set_altstack(stack_t *stk)

@@ -2813,7 +2813,7 @@ static void run_dpmi_thr(void *arg)
 #endif
     if (in_dpmi_pm())
       coopth_yield();
-    else
+    if (!in_dpmi_pm())		// re-check after coopth_yield()! not "else"
       break;
   }
   in_dpmic_thr--;

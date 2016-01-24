@@ -936,6 +936,17 @@ static void async_awake(void *arg)
 
 static int saved_fc;
 
+void signal_switch_to_dosemu(void)
+{
+  saved_fc = fault_cnt;
+  fault_cnt = 0;
+}
+
+void signal_switch_to_dpmi(void)
+{
+  fault_cnt = saved_fc;
+}
+
 void signal_return_to_dosemu(void)
 {
   int err;
@@ -962,8 +973,6 @@ void signal_return_to_dosemu(void)
   err = sigaltstack(&ss, NULL);
   if (err)
     perror("sigaltstack");
-  saved_fc = fault_cnt;
-  fault_cnt = 0;
 #if SIGALTSTACK_WA
   setmcontext(&hack);
 #endif
@@ -971,7 +980,6 @@ void signal_return_to_dosemu(void)
 
 void signal_return_to_dpmi(void)
 {
-  fault_cnt = saved_fc;
 }
 
 void signal_set_altstack(stack_t *stk)

@@ -309,7 +309,7 @@ static inline void *LINEAR2UNIX(unsigned int addr)
 	WRITE_DWORDP(__p, (Bit32u)(val)); \
 	break; \
     default: \
-	error("WRITE_P: unknown size %i\n", sizeof(loc)); \
+	error("WRITE_P: unknown size %zu\n", sizeof(loc)); \
 	break; \
     } \
 } while(0)

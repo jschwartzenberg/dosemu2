@@ -44,7 +44,7 @@ extern void init_handler(struct sigcontext *scp, int async);
 #ifdef __x86_64__
 extern void deinit_handler(struct sigcontext *scp, struct ucontext *uc);
 #else
-#define deinit_handler(scp)
+#define deinit_handler(scp, uc)
 #endif
 
 extern void dosemu_fault(int, siginfo_t *, void *);

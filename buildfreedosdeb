@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# prefix based on prefix from spec file
+BUILD_ROOT=/tmp/fdbuildroot
+FREEDOS_ROOT="$BUILD_ROOT"/usr/share/dosemu/freedos
+
+rm -r "$BUILD_ROOT"
+mkdir -p "$FREEDOS_ROOT"
+./getfreedos "$FREEDOS_ROOT"
+
+mkdir -p "$BUILD_ROOT"/DEBIAN
+CONTROL_FILE="$BUILD_ROOT"/DEBIAN/control
+echo Package: dosemu-freedos > "$CONTROL_FILE"
+echo Version: 1.1 >> "$CONTROL_FILE"
+echo Architecture: all >> "$CONTROL_FILE"
+
+dpkg --build "$BUILD_ROOT" dosemu-freedos_1.1_all.deb

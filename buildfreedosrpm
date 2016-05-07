@@ -1,0 +1,27 @@
+#!/bin/sh
+
+# prefix based on prefix from spec file
+BUILD_ROOT=/tmp/fdbuildroot
+FREEDOS_ROOT="$BUILD_ROOT"/usr/share/dosemu/freedos
+
+rm -r "$BUILD_ROOT"
+mkdir -p "$FREEDOS_ROOT"
+./getfreedos "$FREEDOS_ROOT"
+
+LIST_FILE=/tmp/dosemu-freedost.list
+echo %product dosemufreedos > "$LIST_FILE"
+echo %copyright FreeDOS GPL >> "$LIST_FILE"
+echo %vendor FreeDOS authors >> "$LIST_FILE"
+echo %license GPL >> "$LIST_FILE"
+echo %readme something >> "$LIST_FILE"
+echo %version 1.1 >> "$LIST_FILE"
+echo %description DOSEMU FreeDOS Package >> "$LIST_FILE"
+
+echo \$datadir=/usr/share >> "$LIST_FILE"
+
+cd /tmp/fdbuildroot/usr/share
+# remove symlinks for now, they give problems
+find -type l -delete
+mkepmlist --prefix /usr/share . >> "$LIST_FILE"
+
+epm -vvv -a noarch -f rpm dosemu-freedos "$LIST_FILE"

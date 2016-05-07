@@ -208,26 +208,55 @@ static void install_proprietary(char *proprietary, int warning)
 	free(proprietary);
 }
 
+static void download_freedos()
+{
+	char *boot_dir_path, *system_str;
+	int ret;
+	boot_dir_path = assemble_path(LOCALDIR, "drive_c", 0);
+
+	ret = asprintf(&system_str, "%s/getfreedos %s", dosemu_lib_dir, boot_dir_path);
+	assert(ret != 1);
+
+	system(system_str);
+
+	create_symlink(boot_dir_path, 0);
+
+	free(boot_dir_path);
+	free(system_str);
+}
+
 static void install_no_dosemu_freedos(const char *path)
 {
-	char *p;
-	int specified = 1;
+	char x;
+	int choice;
 	if (path[0] == '\0') {
-		specified = 0;
 		printf_(
-"\nDOSEMU-FreeDOS is not available to boot DOSEMU.\n"
-"Please enter the name of a Linux directory which contains a bootable DOS, or\n"
-"press [Ctrl-C] to abort for manual installation of FreeDOS or another DOS, or\n"
-"press [ENTER] to quit if you suspect an error after manual installation.\n\n"
-);
-		p = dosreadline();
-		if (p[0] == '\0')
-			return;
-		if (p[0] == 3)
-			leavedos(1);
-	} else
-		p = strdup(path);
-	install_proprietary(p, !specified);
+"\nPlease choose one of the following options:\n"
+"1. Download FreeDOS.\n"
+"2. Use a different DOS than the provided DOSEMU-FreeDOS.\n"
+"3. Exit this menu (completely manual setup).\n"
+"[ENTER = the default option 1]\n");
+		x = '1';
+		do {
+			read_string(&x, 1);
+			choice = x - '0';
+			switch (choice) {
+			case 3:
+				/* nothing to be done */
+				return;
+			case 2:
+				printf_(
+	"Please enter the name of a directory which contains a bootable DOS\n");
+				install_proprietary(dosreadline(), 1);
+				return;
+			case 1:
+				download_freedos();
+				return;
+			default:
+				continue;
+			}
+		} while (1);
+	}
 }
 
 static int first_boot_time(void)

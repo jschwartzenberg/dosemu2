@@ -26,6 +26,7 @@ BuildRequires: libao-devel
 BuildRequires: ladspa-devel
 BuildRequires: slang-devel
 BuildRequires: gcc
+BuildRequires: libmspack-devel
 BuildRequires: bison
 BuildRequires: flex
 BuildRequires: gawk

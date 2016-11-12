@@ -118,6 +118,8 @@ install:
 	$(INSTALL) -m 0644 $(SRCPATH)/bindist/fdppconf.sys $(sysdir)
 	$(INSTALL) -m 0644 $(SRCPATH)/bindist/fdppauto.bat $(sysdir)
 	$(INSTALL) -m 0644 $(SRCPATH)/bindist/autoemu.bat $(sysdir)
+	$(INSTALL) -m 0644 $(SRCPATH)/bindist/odconfig.sys $(sysdir)
+	$(INSTALL) -m 0644 $(SRCPATH)/bindist/autodos7.bat $(sysdir)
 	$(INSTALL) -d $(cmddir)
 	for i in `find $(SYS)/* -type f`; do \
 	  $(INSTALL) -m 0644 $$i $(cmddir); \

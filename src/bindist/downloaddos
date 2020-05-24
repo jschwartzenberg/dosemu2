@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import os
 import shutil
 import subprocess
@@ -25,8 +26,7 @@ LIB_URL     = FREEDOS_DEFAULT_MIRROR + '/devel/tools/lib-sk32.zip'
 TOUCH_URL   = FREEDOS_DEFAULT_MIRROR + '/util/file/touch/1.44/touch144.zip'
 WCD_URL     = FREEDOS_DEFAULT_MIRROR + '/util/user/wcd/wcd530b.zip'
 
-DRIVE_ROOT = sys.argv[1]
-TMP_DIR = '/tmp/' + sys.argv[0] + '-' + os.environ['USER'] + '-' + os.getpid()
+TMP_DIR = '/tmp/' + sys.argv[0] + '-' + os.environ['USER'] + '-' + str(os.getpid())
 
 destination = ''
 
@@ -49,7 +49,7 @@ def download_FREEDOS_ARCHIVES(freedos_url):
 
     print('Downloading done')
 
-def extract_7z(archive, filename, destionation_dir):
+def extract_7z(archive, filename, destination_dir):
     print('Extracting ' + filename)
     subprocess.run(['7z', 'e', archive, filename, '-o' + destination_dir, '-y', '-ssc-'])
 
@@ -64,7 +64,7 @@ def download_and_extract(imgurl, imgcnt):
     shutil.rmtree(TMP_DIR)
 
 def verify_tool(executable, package):
-    if subprocess.getstatusoutput('which', executable) != 0:
+    if subprocess.getstatusoutput(['which', executable]) == 0:
         print('Please install ' + package + ' and make sure that ' + executable + ' is on your PATH.')
         sys.exit(1)
 
@@ -98,22 +98,21 @@ def download_dos(dos_flavour):
             print('There was a problem downloading OpenDOS. The downloaded archive could not be verified.')
             sys.exit(1)
 
-def main():
-	verify_system
+verify_system()
 
-	while getopts ld: OPT; do
-	    case "$OPT" in
-	        l) # print list
-	            print('freedos12 FreeDOS 1.2 (2016)')
-	            print('freedos11 FreeDOS 1.1 (2011)')
-	            print('msdos622 Microsoft MS-DOS v6.22 (1994)')
-	            print('opendos702 Caldera OpenDOS 7.02 (1997)')
-	            exit 0
-	            ;;
-	        d) # download the specified DOS
-	            destination = sys.argv[3]
-	            download_dos $OPTARG
-	            exit 0
-	            ;;
-	    esac
-	done
+parser = argparse.ArgumentParser()
+parser.add_argument("-l", "--list", help="List available DOSs", action="store_true")
+parser.add_argument("-d", "--download", help="Download specified DOS", type=str)
+# parser.add_argument("destination", help="installation destination", default=os.environ['HOME'] + '/.dosemu/drive_c')
+
+args = parser.parse_args()
+if args.list:
+    print('freedos12 FreeDOS 1.2 (2016)')
+    print('freedos11 FreeDOS 1.1 (2011)')
+    print('msdos622 Microsoft MS-DOS v6.22 (1994)')
+    print('opendos702 Caldera OpenDOS 7.02 (1997)')
+    sys.exit(0)
+
+if args.download:
+    destination = args.destination
+    download_dos(args.download)

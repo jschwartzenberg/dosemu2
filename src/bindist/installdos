@@ -11,24 +11,14 @@ SOURCE="$1"
 DRIVE_ROOT="$2"
 
 MSDOS_SUBDIRECTORY = 'dos'
-MSEXPAND = ''
-
-def find_msexpand():
-    if subprocess.getstatusoutput(['which', 'msexpand']) != 0:
-        MSEXPAND = 'msexpand'
-    elif subprocess.getstatusoutput(['which', 'dosemu-msexpand']) != 0:
-        MSEXPAND = 'dosemu-msexpand'
-    else:
-        print('Please install ' + 'msexpand' + ' and make sure that ' + 'msexpand' + ' is on your PATH.')
-        sys.exit(1)
 
 def extract_freedos_archives(source, drive_root):
     for filename in Path(source).iterdir():
-        subprocess.run(['unzip', '-d', drive_root, '-qq', '-o', '-LL', filename, '-x', 'packages/*', 'source/*', 'bin/kernl86.sys'],  stdout=subprocess.DEVNULL)
+        subprocess.run(['unzip', '-d', drive_root, '-qq', '-o', '-LL', filename, '-x', 'packages/*', 'source/*', 'bin/kernl86.sys'], stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL)
 
 def extract_freedos_lib(source, drive_root):
     subprocess.run(['unzip', '-d', drive_root + '/bin', '-qq', '-LL', '-o', '-j', source + '/lib.zip', 'llib32/lib.exe'])
-    subprocess.run(['unzip', '-d', drive_root + '/doc/lib' '-qq', '-o', '-LL', '-j', source + '/lib.zip', 'llib32/readme'])
+    subprocess.run(['unzip', '-d', drive_root + '/doc/lib' '-qq', '-o', '-LL', '-j', source + '/lib.zip', 'llib32/readme'], stdout=subprocess.DEVNULL)
 
 def install_freedos(source, drive_root):
     print('Installing FreeDOS...')
@@ -49,11 +39,11 @@ def install_freedos(source, drive_root):
 def expand_files_with_extension(extension, source, drive_root):
     extension_compressed = extension[:2] + '_'
     for filename in Path(source).glob('*.' + extension_compressed):
-        subprocess.run([MSEXPAND, filename])
-        subprocess.run(['mv', filename[:3] + extension[:2], drive_root + '/' + MSDOS_SUBDIRECTORY + '/' + os.path.basename(filename)[:3] + extension])
+        subprocess.run(['dosemu-msexpand', filename, drive_root + '/' + MSDOS_SUBDIRECTORY + '/' + os.path.basename(filename)[:-3] + extension])
 
-def move_to_rootdir(drive_root, filename):
-    subprocess.run(['mv', drive_root + '/' + MSDOS_SUBDIRECTORY + '/' + filename, drive_root + '/'])
+def move_to_rootdir(drive_root, filename_pattern):
+    for filename in Path(drive_root + '/' + MSDOS_SUBDIRECTORY).glob(filename_pattern):
+        shutil.move(str(filename.resolve()), drive_root)
 
 # Manual MS-DOS installation as described in Microsoft KB117245
 def install_msdos(source, drive_root):
@@ -67,7 +57,8 @@ def install_msdos(source, drive_root):
 
     # fill C:\DOS
     for extension in EXTENSION_LIST:
-        subprocess.run(['cp', source + '/*.' + extension, drive_root + '/' + MSDOS_SUBDIRECTORY])
+        for filename in Path(source).glob('*.' + extension):
+            shutil.copy(filename, drive_root + '/' + MSDOS_SUBDIRECTORY)
         expand_files_with_extension(extension, source, drive_root)
 
     for rootdir_file in ROOTDIR_FILES:
@@ -75,8 +66,8 @@ def install_msdos(source, drive_root):
     print('echo Installation complete')
 
 def extract_7z(archive, filename, destination_dir):
-    print('Extracting filename')
-    subprocess.run('7z', 'e', archive, filename, '-o' + destination_dir, '-y', '-ssc-', stdout=subprocess.DEVNULL)
+    print('Extracting ' + archive + '...')
+    subprocess.run(['7z', 'e', archive, filename, '-o' + destination_dir, '-y', '-ssc-'], stdout=subprocess.DEVNULL)
 
 def install_opendos_from_rpm(source, drive_root):
     TMP_DIR = '/tmp/' + os.path.basename(sys.argv[0]) + '-' + os.environ['USER'] + '-' + str(os.getpid())
@@ -100,11 +91,10 @@ if Path(args.source + '/kernel.zip').exists():
     sys.exit(0)
 
 if Path(args.source + '/msdos.sys').exists():
-    find_msexpand()
     install_msdos(args.source, args.destination)
     sys.exit(0)
 
-if Path(args.source + '/opendos-hdimage*.rpm').exists():
+if list(Path(args.source).glob('opendos-hdimage*.rpm'))[0]:
     install_opendos_from_rpm(args.source, args.destination)
     sys.exit(0)
 

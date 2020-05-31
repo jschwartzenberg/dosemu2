@@ -1,131 +1,113 @@
-#!/bin/sh
+#!/usr/bin/python3
+
+import argparse
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
 SOURCE="$1"
 DRIVE_ROOT="$2"
 
-DOS_DIRECTORY=dos
+MSDOS_SUBDIRECTORY = 'dos'
+MSEXPAND = ''
 
-if which msexpand >/dev/null 2>&1 ; then
-  MSEXPAND=msexpand
-elif which dosemu-msexpand >/dev/null 2>&1 ; then
-  MSEXPAND=dosemu-msexpand
-else
-  echo "msexpand tool not found!"
-  exit 1
-fi
+def find_msexpand():
+    if subprocess.getstatusoutput(['which', 'msexpand']) != 0:
+        MSEXPAND = 'msexpand'
+    elif subprocess.getstatusoutput(['which', 'dosemu-msexpand']) != 0:
+        MSEXPAND = 'dosemu-msexpand'
+    else:
+        print('Please install ' + 'msexpand' + ' and make sure that ' + 'msexpand' + ' is on your PATH.')
+        sys.exit(1)
 
-extract_freedos_archives()
-{
-  for filename in $(ls $SOURCE/*.zip)
-  do
-    unzip -d "$DRIVE_ROOT" -qq -o -LL "$filename" -x packages/* source/* bin/kernl86.sys 2>/dev/null
-  done
-}
+def extract_freedos_archives(source, drive_root):
+    for filename in Path(source).iterdir():
+        subprocess.run(['unzip', '-d', drive_root, '-qq', '-o', '-LL', filename, '-x', 'packages/*', 'source/*', 'bin/kernl86.sys'],  stdout=subprocess.DEVNULL)
 
-extract_freedos_lib()
-{
-  unzip -d "$DRIVE_ROOT"/bin -qq -LL -o -j "${SOURCE}"/lib.zip llib32/lib.exe
-  unzip -d "$DRIVE_ROOT"/doc/lib -qq -o -LL -j "${SOURCE}"/lib.zip llib32/readme
-}
+def extract_freedos_lib(source, drive_root):
+    subprocess.run(['unzip', '-d', drive_root + '/bin', '-qq', '-LL', '-o', '-j', source + '/lib.zip', 'llib32/lib.exe'])
+    subprocess.run(['unzip', '-d', drive_root + '/doc/lib' '-qq', '-o', '-LL', '-j', source + '/lib.zip', 'llib32/readme'])
 
-install_freedos()
-{
-  echo Installing FreeDOS...
-  mkdir -p "${DRIVE_ROOT}"
-  extract_freedos_archives
-  extract_freedos_lib
+def install_freedos(source, drive_root):
+    print('Installing FreeDOS...')
+    os.makedirs(drive_root, exist_ok=True)
+    extract_freedos_archives(source, drive_root)
+    extract_freedos_lib(source, drive_root)
 
-  ln -s swsubst.exe "${DRIVE_ROOT}"/bin/join.exe
-  ln -s swsubst.exe "${DRIVE_ROOT}"/bin/subst.exe
-  mv "${DRIVE_ROOT}"/bin/kernl386.sys "${DRIVE_ROOT}"/kernel.sys
-  ln -s bin/command.com "${DRIVE_ROOT}"/command.com
+    subprocess.run(['ln', '-s', 'swsubst.exe', drive_root + '/bin/join.exe'])
+    subprocess.run(['ln', '-s', 'swsubst.exe', drive_root + '/bin/subst.exe'])
+    subprocess.run(['mv', drive_root + '/bin/kernl386.sys', drive_root + '/kernel.sys'])
+    subprocess.run(['ln', '-s', 'bin/command.com', drive_root + '/command.com'])
 
-  chmod 644 "${DRIVE_ROOT}"/appinfo/* "${DRIVE_ROOT}"/bin/* "${DRIVE_ROOT}"/doc/*/* "${DRIVE_ROOT}"/nls/*
-  chmod 755 "${DRIVE_ROOT}"/doc/*
+    subprocess.run(['chmod', '--silent', '644', drive_root + '/appinfo/*', drive_root + '/bin/*', drive_root + '/doc/*/*', drive_root + '/nls/*'])
+    subprocess.run(['chmod', '--silent', '755', drive_root + '/doc/*'])
 
-  echo Installation complete
-}
+    print('Installation complete')
 
-expand_files_with_extension()
-{
-  EXTENSION=$1
-  EXTENSION_COMPRESSED="${1%?}_"
-  ls "$SOURCE"/*.$EXTENSION_COMPRESSED > /dev/null 2> /dev/null
-  if [ $? -eq 0 ] # continue only if there are compressed files with this extension
-  then
-    for i in "$SOURCE"/*.$EXTENSION_COMPRESSED
-    do
-      $MSEXPAND "$i" ${DRIVE_ROOT}/"${DOS_DIRECTORY}"/`basename "${i%.???}.$EXTENSION"`
-    done
-  fi
-}
+def expand_files_with_extension(extension, source, drive_root):
+    extension_compressed = extension[:2] + '_'
+    for filename in Path(source).glob('*.' + extension_compressed):
+        subprocess.run([MSEXPAND, filename])
+        subprocess.run(['mv', filename[:3] + extension[:2], drive_root + '/' + MSDOS_SUBDIRECTORY + '/' + os.path.basename(filename)[:3] + extension])
 
-move_to_rootdir()
-{
-  mv "${DRIVE_ROOT}"/"${DOS_DIRECTORY}"/$1 "${DRIVE_ROOT}"/ 2> /dev/null
-}
+def move_to_rootdir(drive_root, filename):
+    subprocess.run(['mv', drive_root + '/' + MSDOS_SUBDIRECTORY + '/' + filename, drive_root + '/'])
 
 # Manual MS-DOS installation as described in Microsoft KB117245
-install_msdos()
-{
-  echo Installing MS-DOS...
-  mkdir -p "${DRIVE_ROOT}"/"${DOS_DIRECTORY}"
+def install_msdos(source, drive_root):
+    # it's not possible to deduce the final letter of the extension, so we have to provide the list
+    EXTENSION_LIST = ['inf', '386', 'bin', 'com', 'cpi', 'dll', 'exe', 'ovl', 'sys', 'txt', 'grp', 'hlp', 'lst', 'pro']
+    # these files should be in the root of the drive instead of the dos directory
+    ROOTDIR_FILES = ['wina20.386', '???space.bin', 'io.sys', 'msdos.sys', 'command.com']
 
-  # it's not possible to deduce the final letter of the extension, so we have to provide the list
-  EXTENSION_LIST="inf 386 bin com cpi dll exe ovl sys txt grp hlp lst pro"
+    print('Installing MS-DOS...')
+    os.makedirs(drive_root + '/' + MSDOS_SUBDIRECTORY, exist_ok=True)
 
-  # fill C:\DOS
-  for extension in $EXTENSION_LIST
-  do
-    cp "$SOURCE"/*.$extension "${DRIVE_ROOT}"/"${DOS_DIRECTORY}" 2> /dev/null
-    expand_files_with_extension $extension
-  done
+    # fill C:\DOS
+    for extension in EXTENSION_LIST:
+        subprocess.run(['cp', source + '/*.' + extension, drive_root + '/' + MSDOS_SUBDIRECTORY])
+        expand_files_with_extension(extension, source, drive_root)
 
-  ROOTDIR_FILES="wina20.386 ???space.bin io.sys msdos.sys command.com"
+    for rootdir_file in ROOTDIR_FILES:
+        move_to_rootdir(drive_root, rootdir_file)
+    print('echo Installation complete')
 
-  for rootdir_file in $ROOTDIR_FILES
-  do
-    move_to_rootdir $rootdir_file
-  done
-  echo Installation complete
-}
+def extract_7z(archive, filename, destination_dir):
+    print('Extracting filename')
+    subprocess.run('7z', 'e', archive, filename, '-o' + destination_dir, '-y', '-ssc-', stdout=subprocess.DEVNULL)
 
-extract_7z()
-{
-  ARCHIVE="$1"
-  FILENAME="$2"
-  DESTINATION_DIR=$3
-  echo Extracting $FILENAME
-  7z e "$ARCHIVE" $FILENAME -o"$DESTINATION_DIR" -y -ssc- >/dev/null
-}
+def install_opendos_from_rpm(source, drive_root):
+    TMP_DIR = '/tmp/' + os.path.basename(sys.argv[0]) + '-' + os.environ['USER'] + '-' + str(os.getpid())
+    os.makedirs(TMP_DIR, exist_ok=True)
+    os.makedirs(drive_root, exist_ok=True)
+    extract_7z(source + '/opendos-hdimage*.rpm', "", TMP_DIR)
+    extract_7z(TMP_DIR + '/opendos-hdimage*.cpio', 'hdimage.od', TMP_DIR)
+    subprocess.run(['mcopy', '-sn', '-i', TMP_DIR + '/hdimage.od@@32384', '::*', drive_root], env={"PATH": os.environ['PATH'], "MTOOLS_LOWER_CASE": '1'})
+    shutil.rmtree(TMP_DIR)
 
-install_opendos_from_rpm()
-{
-  TMP_DIR=/tmp/"`basename $0`-$USER-$$"
-  mkdir -p "$TMP_DIR" "${DRIVE_ROOT}"
-  extract_7z $SOURCE/opendos-hdimage*.rpm "" "$TMP_DIR"
-  extract_7z "$TMP_DIR"/opendos-hdimage*.cpio hdimage.od "$TMP_DIR"
-  MTOOLS_LOWER_CASE=1 mcopy -sn -i "$TMP_DIR"/hdimage.od@@32384 ::* "${DRIVE_ROOT}"
-  rm -r "$TMP_DIR"
-}
+
+parser = argparse.ArgumentParser()
+parser.add_argument("source", type=str, help="source directory containing DOS installation files")
+parser.add_argument("destination", type=str, help="destination root directory")
+
+args = parser.parse_args()
 
 # Detect which DOS is provided and run the appropriate installation routine
+if Path(args.source + '/kernel.zip').exists():
+    install_freedos(args.source, args.destination)
+    sys.exit(0)
 
-if [ -e $SOURCE/kernel.zip ] ; then
-  install_freedos
-  exit 0
-fi
+if Path(args.source + '/msdos.sys').exists():
+    find_msexpand()
+    install_msdos(args.source, args.destination)
+    sys.exit(0)
 
-if [ -e $SOURCE/msdos.sys ] ; then
-  install_msdos
-  exit 0
-fi
+if Path(args.source + '/opendos-hdimage*.rpm').exists():
+    install_opendos_from_rpm(args.source, args.destination)
+    sys.exit(0)
 
-if [ -e $SOURCE/opendos-hdimage*.rpm ] ; then
-  install_opendos_from_rpm
-  exit 0
-fi
-
-echo "No DOS installation files were found."
-echo "Run loaddosinstall as root to download a version of DOS."
-exit 1
+print('No DOS installation files were found.')
+print('Run loaddosinstall as root to download a version of DOS.')
+sys.exit(1)
